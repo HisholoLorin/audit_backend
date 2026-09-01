@@ -74,61 +74,95 @@ class DashboardSummaryView(APIView):
     def get(self, request):
         today = date.today()
         current_month = today.replace(day=1)
-        
-        # Current month salary
-        salary_obj = MonthlySalary.objects.filter(user=request.user, month=current_month).first()
-        current_month_salary = salary_obj.amount if salary_obj else 0
-        
+        last_month = current_month - relativedelta(months=1)
+
+        # ─── Opening Balance ──────────────────────────────────────────────────
+        # Salary for month M is credited (received) in month M+1.
+        # Opening balance = all salaries credited *before* the current month
+        #                 − all expenses incurred *before* the current month.
+        #
+        # Salaries credited before current month → salary.month < current_month
+        # (salary.month == last_month was credited this month, so exclude it too;
+        #  only salaries whose month < last_month have been credited before today's month)
+        # Actually: salary of month M is credited in month M+1.
+        # So salaries credited BEFORE current_month means salary.month < last_month.
+        past_salaries_credited = MonthlySalary.objects.filter(
+            user=request.user,
+            month__lt=last_month   # salary.month < last_month → credited before current month
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        past_expenses = Expense.objects.filter(
+            user=request.user,
+            date__lt=current_month  # expenses before this month
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        opening_balance = float(past_salaries_credited) - float(past_expenses)
+
+        # ─── Closing Balance ──────────────────────────────────────────────────
+        # Salary credited this month = last month's salary record
+        credited_this_month_obj = MonthlySalary.objects.filter(
+            user=request.user, month=last_month
+        ).first()
+        credited_this_month = float(credited_this_month_obj.amount) if credited_this_month_obj else 0
+
         # Current month expenses
-        expenses = Expense.objects.filter(user=request.user, date__year=today.year, date__month=today.month)
-        total_expenses = expenses.aggregate(Sum('amount'))['amount__sum'] or 0
-        
-        # Remaining balance
-        remaining_balance = float(current_month_salary) - float(total_expenses)
-        
-        # Category count
+        expenses = Expense.objects.filter(
+            user=request.user,
+            date__year=today.year,
+            date__month=today.month,
+        )
+        total_expenses = float(expenses.aggregate(Sum('amount'))['amount__sum'] or 0)
+
+        closing_balance = opening_balance + credited_this_month - total_expenses
+
+        # ─── Category count ───────────────────────────────────────────────────
         category_count = Category.objects.filter(user=request.user).count()
-        
-        # Expenses by category
+
+        # ─── Expenses by category (current month) ────────────────────────────
         expenses_by_category = []
         for cat in Category.objects.filter(user=request.user):
             cat_total = expenses.filter(category=cat).aggregate(Sum('amount'))['amount__sum'] or 0
             if cat_total > 0:
                 expenses_by_category.append({
                     'category_name': cat.name,
-                    'total': cat_total,
+                    'total': float(cat_total),
                     'color': cat.color
                 })
-                
-        # Recent expenses
+
+        # ─── Recent expenses ──────────────────────────────────────────────────
         recent_expenses = ExpenseSerializer(
-            Expense.objects.filter(user=request.user).order_by('-date', '-created_at')[:5], 
+            Expense.objects.filter(user=request.user).order_by('-date', '-created_at')[:5],
             many=True
         ).data
-        
-        # Monthly trend
+
+        # ─── Monthly trend (last 6 months) ───────────────────────────────────
         monthly_trend = []
         for i in range(5, -1, -1):
             target_month = current_month - relativedelta(months=i)
-            
+
             m_salary = MonthlySalary.objects.filter(user=request.user, month=target_month).first()
-            m_salary_val = m_salary.amount if m_salary else 0
-            
-            m_expenses = Expense.objects.filter(user=request.user, date__year=target_month.year, date__month=target_month.month)
-            m_expenses_val = m_expenses.aggregate(Sum('amount'))['amount__sum'] or 0
-            
+            m_salary_val = float(m_salary.amount) if m_salary else 0
+
+            m_expenses = Expense.objects.filter(
+                user=request.user,
+                date__year=target_month.year,
+                date__month=target_month.month,
+            )
+            m_expenses_val = float(m_expenses.aggregate(Sum('amount'))['amount__sum'] or 0)
+
             monthly_trend.append({
                 'month': target_month.strftime('%Y-%m'),
                 'total_expenses': m_expenses_val,
-                'salary': m_salary_val
+                'salary': m_salary_val,
             })
-            
+
         return Response({
-            'current_month_salary': current_month_salary,
+            'opening_balance': opening_balance,
+            'closing_balance': closing_balance,
+            'credited_this_month': credited_this_month,
             'total_expenses': total_expenses,
-            'remaining_balance': remaining_balance,
             'category_count': category_count,
             'expenses_by_category': expenses_by_category,
             'monthly_trend': monthly_trend,
-            'recent_expenses': recent_expenses
+            'recent_expenses': recent_expenses,
         })
