@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, MonthlySalary, Expense
+from .models import Category, MonthlyIncome, Expense
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -7,8 +7,8 @@ class CategoryAdmin(admin.ModelAdmin):
     list_filter = ('user',)
     search_fields = ('name',)
 
-@admin.register(MonthlySalary)
-class MonthlySalaryAdmin(admin.ModelAdmin):
+@admin.register(MonthlyIncome)
+class MonthlyIncomeAdmin(admin.ModelAdmin):
     list_display = ('user', 'month', 'amount', 'created_at')
     list_filter = ('user', 'month')
 

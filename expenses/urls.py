@@ -4,7 +4,7 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'categories', views.CategoryViewSet, basename='category')
-router.register(r'salary', views.MonthlySalaryViewSet, basename='salary')
+router.register(r'income', views.MonthlyIncomeViewSet, basename='income')
 router.register(r'expenses', views.ExpenseViewSet, basename='expense')
 
 urlpatterns = [

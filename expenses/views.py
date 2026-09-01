@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from django.db.models import Sum
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-from .models import Category, MonthlySalary, Expense
-from .serializers import CategorySerializer, MonthlySalarySerializer, ExpenseSerializer
+from .models import Category, MonthlyIncome, Expense
+from .serializers import CategorySerializer, MonthlyIncomeSerializer, ExpenseSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -17,12 +17,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class MonthlySalaryViewSet(viewsets.ModelViewSet):
-    serializer_class = MonthlySalarySerializer
+class MonthlyIncomeViewSet(viewsets.ModelViewSet):
+    serializer_class = MonthlyIncomeSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = MonthlySalary.objects.filter(user=self.request.user)
+        queryset = MonthlyIncome.objects.filter(user=self.request.user)
         month = self.request.query_params.get('month', None)
         if month:
             try:
@@ -77,18 +77,18 @@ class DashboardSummaryView(APIView):
         last_month = current_month - relativedelta(months=1)
 
         # ─── Opening Balance ──────────────────────────────────────────────────
-        # Salary for month M is credited (received) in month M+1.
-        # Opening balance = all salaries credited *before* the current month
+        # Income for month M is credited (received) in month M+1.
+        # Opening balance = all incomes credited *before* the current month
         #                 − all expenses incurred *before* the current month.
         #
-        # Salaries credited before current month → salary.month < current_month
-        # (salary.month == last_month was credited this month, so exclude it too;
-        #  only salaries whose month < last_month have been credited before today's month)
-        # Actually: salary of month M is credited in month M+1.
-        # So salaries credited BEFORE current_month means salary.month < last_month.
-        past_salaries_credited = MonthlySalary.objects.filter(
+        # Incomes credited before current month → income.month < current_month
+        # (income.month == last_month was credited this month, so exclude it too;
+        #  only incomes whose month < last_month have been credited before today's month)
+        # Actually: income of month M is credited in month M+1.
+        # So incomes credited BEFORE current_month means income.month < last_month.
+        past_incomes_credited = MonthlyIncome.objects.filter(
             user=request.user,
-            month__lt=last_month   # salary.month < last_month → credited before current month
+            month__lt=last_month   # income.month < last_month → credited before current month
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
         past_expenses = Expense.objects.filter(
@@ -96,11 +96,11 @@ class DashboardSummaryView(APIView):
             date__lt=current_month  # expenses before this month
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
-        opening_balance = float(past_salaries_credited) - float(past_expenses)
+        opening_balance = float(past_incomes_credited) - float(past_expenses)
 
         # ─── Closing Balance ──────────────────────────────────────────────────
-        # Salary credited this month = last month's salary record
-        credited_this_month_obj = MonthlySalary.objects.filter(
+        # Income credited this month = last month's income record
+        credited_this_month_obj = MonthlyIncome.objects.filter(
             user=request.user, month=last_month
         ).first()
         credited_this_month = float(credited_this_month_obj.amount) if credited_this_month_obj else 0
@@ -140,8 +140,8 @@ class DashboardSummaryView(APIView):
         for i in range(5, -1, -1):
             target_month = current_month - relativedelta(months=i)
 
-            m_salary = MonthlySalary.objects.filter(user=request.user, month=target_month).first()
-            m_salary_val = float(m_salary.amount) if m_salary else 0
+            m_income = MonthlyIncome.objects.filter(user=request.user, month=target_month).first()
+            m_income_val = float(m_income.amount) if m_income else 0
 
             m_expenses = Expense.objects.filter(
                 user=request.user,
@@ -153,7 +153,7 @@ class DashboardSummaryView(APIView):
             monthly_trend.append({
                 'month': target_month.strftime('%Y-%m'),
                 'total_expenses': m_expenses_val,
-                'salary': m_salary_val,
+                'income': m_income_val,
             })
 
         return Response({

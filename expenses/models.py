@@ -16,8 +16,8 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
-class MonthlySalary(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='salaries')
+class MonthlyIncome(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='incomes')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     month = models.DateField(help_text='First day of the month')  # Always store as YYYY-MM-01
     notes = models.TextField(blank=True, default='')
@@ -25,7 +25,7 @@ class MonthlySalary(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name_plural = 'monthly salaries'
+        verbose_name_plural = 'monthly incomes'
         unique_together = ['user', 'month']
         ordering = ['-month']
 

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, MonthlySalary, Expense
+from .models import Category, MonthlyIncome, Expense
 from datetime import date
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -8,9 +8,9 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('user', 'created_at')
 
-class MonthlySalarySerializer(serializers.ModelSerializer):
+class MonthlyIncomeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = MonthlySalary
+        model = MonthlyIncome
         fields = '__all__'
         read_only_fields = ('user', 'created_at', 'updated_at')
 
