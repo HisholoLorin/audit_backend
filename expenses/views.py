@@ -99,11 +99,12 @@ class DashboardSummaryView(APIView):
         opening_balance = float(past_incomes_credited) - float(past_expenses)
 
         # ─── Closing Balance ──────────────────────────────────────────────────
-        # Income credited this month = last month's income record
-        credited_this_month_obj = MonthlyIncome.objects.filter(
-            user=request.user, month=last_month
-        ).first()
-        credited_this_month = float(credited_this_month_obj.amount) if credited_this_month_obj else 0
+        # Income credited this month = sum of all last month's income records
+        credited_this_month = float(
+            MonthlyIncome.objects.filter(
+                user=request.user, month=last_month
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
+        )
 
         # Current month expenses
         expenses = Expense.objects.filter(
@@ -140,8 +141,11 @@ class DashboardSummaryView(APIView):
         for i in range(5, -1, -1):
             target_month = current_month - relativedelta(months=i)
 
-            m_income = MonthlyIncome.objects.filter(user=request.user, month=target_month).first()
-            m_income_val = float(m_income.amount) if m_income else 0
+            m_income_val = float(
+                MonthlyIncome.objects.filter(
+                    user=request.user, month=target_month
+                ).aggregate(Sum('amount'))['amount__sum'] or 0
+            )
 
             m_expenses = Expense.objects.filter(
                 user=request.user,
