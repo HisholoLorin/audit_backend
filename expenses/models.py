@@ -48,3 +48,29 @@ class Expense(models.Model):
 
     def __str__(self):
         return f'{self.title} - {self.amount}'
+
+class BreakdownCluster(models.Model):
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='clusters')
+    name = models.CharField(max_length=200)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'created_at']
+
+    def __str__(self):
+        return f'{self.name} - {self.date}'
+
+class ExpenseBreakdown(models.Model):
+    cluster = models.ForeignKey(BreakdownCluster, on_delete=models.CASCADE, related_name='items', null=True, blank=True)
+    name = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.CharField(max_length=50, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        qty = f' ({self.quantity})' if self.quantity else ''
+        return f'{self.name}{qty} - {self.amount}'

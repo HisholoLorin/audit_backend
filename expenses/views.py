@@ -1,11 +1,12 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, filters, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Sum
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
-from .models import Category, MonthlyIncome, Expense
-from .serializers import CategorySerializer, MonthlyIncomeSerializer, ExpenseSerializer
+from .models import Category, MonthlyIncome, Expense, BreakdownCluster, ExpenseBreakdown
+from .serializers import CategorySerializer, MonthlyIncomeSerializer, ExpenseSerializer, BreakdownClusterSerializer, ExpenseBreakdownSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -67,6 +68,43 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class BreakdownClusterViewSet(viewsets.ModelViewSet):
+    serializer_class = BreakdownClusterSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return BreakdownCluster.objects.filter(
+            expense_id=self.kwargs['expense_pk'],
+            expense__user=self.request.user
+        )
+
+    def perform_create(self, serializer):
+        expense = get_object_or_404(
+            Expense, pk=self.kwargs['expense_pk'], user=self.request.user
+        )
+        serializer.save(expense=expense)
+
+class ExpenseBreakdownViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseBreakdownSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ExpenseBreakdown.objects.filter(
+            cluster_id=self.kwargs['cluster_pk'],
+            cluster__expense_id=self.kwargs['expense_pk'],
+            cluster__expense__user=self.request.user
+        )
+
+    def perform_create(self, serializer):
+        cluster = get_object_or_404(
+            BreakdownCluster,
+            pk=self.kwargs['cluster_pk'],
+            expense_id=self.kwargs['expense_pk'],
+            expense__user=self.request.user
+        )
+        serializer.save(cluster=cluster)
+
 
 class DashboardSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
